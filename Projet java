@@ -1,0 +1,349 @@
+import java.awt.* ;
+import java.awt.event.* ;
+import java.applet.* ;
+import java.util.* ;
+
+public class demineur extends java.applet.Applet implements ActionListener {
+
+    static final long serialVersionUID = 180415L;
+    TextField tlargeur, thauteur, tmines, ttimer, tnmines;
+    int hauteur, largeur, mines, pas, nmines;
+    Button ok;
+    Random rnd;
+    int [] [] grille;
+    Dessin d;
+    Timer timer;
+    TT tt;
+    int compteur, ccases, ncases;
+
+/*
+ * convertit le contenu d'un champ de texte en nombre entier
+ * retourne n en cas d'échec
+ */
+
+    private int parse (TextField tf, int n) {
+        int n1 = n;
+        try {
+            n1 = Integer.parseInt (tf.getText ());
+            if (n1 <= 0)
+                n1 = n;
+        }
+        catch (NumberFormatException nfe) { }
+        tf.setText (Integer.toString (n1));
+        return n1;
+    }
+
+/*
+ * initialisation de la grille ; grille [l] [h] = 10 pour une mine déposée à la case de coordonnées l, h.
+ * renseigne les cases adjacentes en faisant figurer le nombre de mines (de 1 à 8) voisines de la case de coordonnées l, h.
+ * 0 (valeur par défaut) si pas de mines proches de la case.
+ */
+
+    private void initgrille (int largeur, int hauteur, int mines) {
+        grille = new int [largeur] [hauteur];
+        for (int i = 0; i < mines; i ++) {
+            int l, h;
+// choix au hasard d'une case libre pour y déposer une mine
+            do {
+                l = rnd.nextInt (largeur);
+                h = rnd.nextInt (hauteur);
+            }
+            while (grille [l] [h] == 10);
+            grille [l] [h] = 10;
+        }
+        for (int i = 0; i < largeur; i++) {
+            for (int j = 0; j < hauteur; j++) {
+                if (grille [i] [j] != 10) {
+// On met à jour les cases voisines de la case contenant la mine
+                    if ((i > 0) && (j > 0) && (grille [i - 1] [j - 1] == 10))
+                        grille [i] [j] ++;
+                    if ((i > 0) && (grille [i - 1] [j] == 10))
+                        grille [i] [j] ++;
+                    if ((i > 0) && (j < hauteur - 1) && (grille [i - 1] [j + 1] == 10))
+                        grille [i] [j] ++;
+                    if ((j > 0) && (grille [i] [j - 1] == 10))
+                        grille [i] [j] ++;
+                    if ((j < hauteur - 1) && (grille [i] [j + 1] == 10))
+                        grille [i] [j] ++;
+                    if ((i < largeur - 1) && (j > 0) && (grille [i + 1] [j - 1] == 10))
+                        grille [i] [j] ++;
+                    if ((i < largeur - 1) && (grille [i + 1] [j] == 10))
+                        grille [i] [j] ++;
+                    if ((i < largeur - 1) && (j < hauteur - 1) && (grille [i + 1] [j + 1] == 10))
+                        grille [i] [j] ++;
+                }
+            }
+        }
+    }
+
+/*
+ * initialisation de l'applet
+ *
+ */
+
+    public void init () {
+        setFont (new Font ("Arial, Helvetica, Sans-serif", Font.PLAIN, 10));
+        setLayout (new BorderLayout ());
+// on met en place les objets (champs de saisie, bouton...)
+        Panel p = new Panel ();
+        p.setBackground (Color.LIGHT_GRAY);
+        add (p, BorderLayout.NORTH);
+        p.add (new Label ("Largeur : "));
+        p.add (tlargeur = new TextField ("9", 5));
+        p.add (new Label ("Hauteur : "));
+        p.add (thauteur = new TextField ("9", 5));
+        p.add (new Label ("Mines : "));
+        p.add (tmines = new TextField ("10", 5));
+        p.add (ok = new Button ("Ok"));
+        ok.addActionListener (this);
+        p = new Panel ();
+        p.setBackground (Color.LIGHT_GRAY);
+        add (p, BorderLayout.SOUTH);
+        p.add (ttimer = new TextField ("0", 5));
+        p.add (tnmines = new TextField ("10", 5));
+        add (d = new Dessin (), BorderLayout.CENTER);
+// on met en place le timer
+        tt = new TT ();
+        timer = new Timer ();
+        timer.schedule (tt, 0, 1000);
+// on met en place le générateur de nombres aléatoires
+        rnd = new Random ();
+        init1 ();
+    }
+
+/*
+ * initialisation : installation de l'applet ou appui sur le bouton ok
+ *
+ */
+
+    private void init1 () {
+// on récupère le nombre de cases en largeur, en hauteur et le nombre de mines
+        int l = largeur;
+        int h = hauteur;
+        int m = mines;
+        largeur = parse (tlargeur, largeur);
+        hauteur = parse (thauteur, hauteur);
+        mines = parse (tmines, mines);
+// trop de mines => on remet les données initiales
+        if (mines >= largeur * hauteur) {
+            largeur = l;
+            hauteur = h;
+            mines = m;
+            tlargeur.setText (Integer.toString (largeur));
+            thauteur.setText (Integer.toString (hauteur));
+            tmines.setText (Integer.toString (mines));
+        }
+// initialisation de la grille
+        initgrille (largeur, hauteur, mines);
+// initialisation du compteur du timer
+        compteur = -1;
+        ttimer.setText ("0");
+        ccases = 0;
+        ncases = hauteur * largeur;
+// initialisation de nmines qui contient le nombre de mines à trouver
+        nmines = mines;
+        tnmines.setText (Integer.toString (nmines));
+    }
+
+/*
+ * réponse à l'appui sur le bouton Ok
+ *
+ */
+
+    public void actionPerformed (ActionEvent e) {
+        if (e.getSource () == ok) {
+            init1 ();
+            d.repaint ();
+        }
+    }
+
+    public String getAppletInfo () {
+        return "Démineur par J.-P. Quelen - 20/07/12" ; }
+
+/*
+ * feuille sur laquelle se fait le dessin
+ *
+ */
+
+protected class Dessin extends Canvas implements MouseListener {
+
+    static final long serialVersionUID = 210712L;
+    Image img;
+    Graphics g;
+    int w, h;
+    boolean gagne;
+
+    public Dessin () {
+        addMouseListener (this);
+    }
+
+    public void update (Graphics g) {
+        paint (g) ;
+    }
+
+    public void paint (Graphics g1) {
+        if (img == null) {
+// premier graphique : on initialise
+            w = getSize().width;
+            h = getSize().height;
+            img = createImage (w, h);
+            g = img.getGraphics ();
+        }
+// on dessine sur img
+        g.setColor (Color.WHITE);
+        g.fillRect (0, 0, w, h);
+        g.setColor (Color.BLACK);
+        pas = Math.min ((w - 20) / largeur, (h - 20) / hauteur);
+        for (int i = 0; i < largeur; i++)
+            for (int j = 0; j < hauteur; j++)
+                g.drawRect (10 + i * pas, 10 + j * pas, pas, pas);
+        gagne = true;
+        for (int i = 0; i < largeur; i++)
+            for (int j = 0; j < hauteur; j++) {
+                    int grilleij = grille [i] [j];
+// dessin d'un cercle rouge, emplacement défini par l'utilisateur
+                    if (grilleij >= 15) {
+                        g.setColor (Color.RED);
+                        g.drawOval (11 + i * pas, 11 + j * pas, pas - 2, pas - 2);
+                    }
+// case à contenu encore inconnu : couleur bleue
+                    else if (grilleij >= 0) {
+                        g.setColor (Color.BLUE);
+                        g.fillRect (11 + i * pas, 11 + j * pas, pas - 2, pas - 2);
+                    }
+// case contenant une mine
+                    else if (grille [i] [j] == -10) {
+                        g.setColor (Color.RED);
+                        g.fillOval (11 + i * pas, 11 + j * pas, pas - 2, pas - 2);
+                        gagne = false;
+                    }
+// on affiche le nombre de mines à proximité
+                    else if (grille [i] [j] != -9) {
+                        g.setColor (Color.BLACK);
+                        g.drawString (Integer.toString (- grilleij), 10 + i * pas + pas / 2, 10 + j * pas + pas / 2);
+                    }
+                }
+// on bascule img dans la fenêtre graphique
+        g1.drawImage (img, 0, 0, this);
+        if (ccases >= ncases)
+            tnmines.setText ((gagne) ? "gagné" : "perdu");
+    }
+
+/*
+ * Si la case contient le nombre de mines à proximité on remplace ce nombre par son opposé
+ * Si la case est blanche, il n'y a aucune mine dans les cases adjacentes, on détecte donc toutes
+ * les cases blanches à partir de la case active par une recherche récursive
+ */
+
+    private void exploreCaseBlanche (int x, int y) {
+        if ((x >= 0) && (x < largeur) && (y >= 0) && (y < hauteur) && (grille [x] [y] < 15)) {
+            if (grille [x] [y] > 0) {
+                if (grille [x] [y] == 10) {
+                    nmines --;
+                    tnmines.setText (Integer.toString (nmines));
+                }
+                grille [x] [y] = - grille [x] [y];
+                ccases ++;
+            }
+            else if (grille [x] [y] == 0) {
+                grille [x] [y] = -9;
+                ccases ++;
+                exploreCaseBlanche (x - 1, y - 1);
+                exploreCaseBlanche (x - 1, y);
+                exploreCaseBlanche (x - 1, y + 1);
+                exploreCaseBlanche (x, y - 1);
+                exploreCaseBlanche (x, y + 1);
+                exploreCaseBlanche (x + 1, y - 1);
+                exploreCaseBlanche (x + 1, y);
+                exploreCaseBlanche (x + 1, y + 1);
+            }
+        }
+    }
+
+/*
+ * Réponse à l'action sur un bouton de la souris
+ *
+ */
+
+    public void mousePressed (MouseEvent e) {
+// Si ce n'est pas déjà fait on déclenche le compteur
+        if (compteur < 0)
+            compteur = 0;
+// Si c'est fini on bloque l'action sur le bouton de la souris
+        if (ccases < ncases) {
+// On récupère les coordonnées de la case
+            int x = (e.getX () - 10) / pas;
+            int y = (e.getY () - 10) / pas;
+            if (e.getButton () == MouseEvent.BUTTON1)
+                exploreCaseBlanche (x, y);
+            else {
+// Bouton 2 pressé : on positionne ou on retire un drapeau pour indiquer une mine
+                if ((x >= 0) && (x < largeur) && (y >= 0) && (y < hauteur) && (grille [x] [y] >= 0)) {
+                    if (grille [x] [y] >= 15) {
+                        grille [x] [y] -= 15;
+                        nmines ++;
+                        if (grille [x] [y] == 10)
+                            ccases --;
+                    }
+                    else {
+                        if (grille [x] [y] == 10)
+                            ccases ++;
+                        grille [x] [y] += 15;
+                        nmines --;
+                    }
+                    tnmines.setText (Integer.toString (nmines));
+                }
+            }
+        repaint ();
+        }
+    }
+
+    public void mouseExited (MouseEvent e) { }
+    public void mouseEntered (MouseEvent e) { }
+    public void mouseReleased (MouseEvent e) { }
+    public void mouseClicked (MouseEvent e) { }
+
+}
+
+/*
+ * Tâche exécutée par le timer toutes les secondes
+ *
+ */
+
+protected class TT extends TimerTask implements Runnable {
+
+    public void run () {
+        if ((compteur >= 0) && (ccases < ncases)) {
+            compteur ++;
+            ttimer.setText (Integer.toString (compteur));
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+public static void main (String args []) {
+	int w = 500;
+	int h = 400;
+
+// Création et lancement de l'applet
+	demineur d = new demineur();
+	d.init();
+	d.start();
+
+// Création de la fenêtre contenant l'applet
+	Frame f = new Frame ("Démineur") ;
+	f.addWindowListener (new fermer ()) ;
+	f.add (d) ;
+	f.setSize (w, h) ;
+	f.setVisible (true);
+}
+
+// Permet la fermeture de la fenêtre contenant l'applet
+protected static final class fermer extends WindowAdapter {
+	public void windowClosing (WindowEvent e) {
+		System.exit (0) ;
+	}
+}
+
+
+}
